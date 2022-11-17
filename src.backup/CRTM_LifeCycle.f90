@@ -9,7 +9,6 @@
 ! Modified by:    Cheng Dang, 1-Aug-2020
 !                 dangch@ucar.edu
 !                 Add optional arguments for aerosol/cloud scheme/file/format
-! CRTM LifeCycle with CSEM 
 
 MODULE CRTM_LifeCycle
 
@@ -39,12 +38,27 @@ MODULE CRTM_LifeCycle
   ! ...Cloud optical properties
   USE CRTM_CloudCoeff        , ONLY: CRTM_CloudCoeff_Load, &
                                      CRTM_CloudCoeff_Destroy
-  !CSEM set up
-  USE CSEM_LifeCycle
-  !USE CSEM_SET_UP
-  USE CSEM_Model_Manager,       ONLY:  CSEM_Model_ID, Inq_Model_Option
-
-
+  ! ...Infrared surface emissivities
+  USE CRTM_IRwaterCoeff      , ONLY: CRTM_IRwaterCoeff_Load, &
+                                     CRTM_IRwaterCoeff_Destroy
+  USE CRTM_IRlandCoeff       , ONLY: CRTM_IRlandCoeff_Load, &
+                                     CRTM_IRlandCoeff_Destroy
+  USE CRTM_IRsnowCoeff       , ONLY: CRTM_IRsnowCoeff_Load, &
+                                     CRTM_IRsnowCoeff_Destroy
+  USE CRTM_IRiceCoeff        , ONLY: CRTM_IRiceCoeff_Load, &
+                                     CRTM_IRiceCoeff_Destroy
+  ! ...Visible surface emissivities
+  USE CRTM_VISwaterCoeff     , ONLY: CRTM_VISwaterCoeff_Load, &
+                                     CRTM_VISwaterCoeff_Destroy
+  USE CRTM_VISlandCoeff      , ONLY: CRTM_VISlandCoeff_Load, &
+                                     CRTM_VISlandCoeff_Destroy
+  USE CRTM_VISsnowCoeff      , ONLY: CRTM_VISsnowCoeff_Load, &
+                                     CRTM_VISsnowCoeff_Destroy
+  USE CRTM_VISiceCoeff       , ONLY: CRTM_VISiceCoeff_Load, &
+                                     CRTM_VISiceCoeff_Destroy
+  ! ...Microwave surface emissivities
+  USE CRTM_MWwaterCoeff      , ONLY: CRTM_MWwaterCoeff_Load, &
+                                     CRTM_MWwaterCoeff_Destroy
   ! Disable all implicit typing
   IMPLICIT NONE
 
@@ -66,7 +80,6 @@ MODULE CRTM_LifeCycle
   INTEGER, PARAMETER :: ML = 256   ! Error message length
   INTEGER, PARAMETER :: SL = 5000  ! Maximum length for path+filenames
 
-  LOGICAL :: IS_CSEM_INIT = .FALSE.
 
 CONTAINS
 
@@ -454,14 +467,10 @@ CONTAINS
     CHARACTER(SL) :: Default_VISiceCoeff_File
     CHARACTER(SL) :: Default_MWwaterCoeff_File
 
-    CHARACTER(SL) :: CSEM_Config="csem_model.registor"
 
     INTEGER :: l, n, n_Sensors
     LOGICAL :: Local_Load_CloudCoeff
     LOGICAL :: Local_Load_AerosolCoeff
-
-    LOGICAL :: CSEM_Config_Exist
-    TYPE(CSEM_MODEL_ID) :: MODEL
 
     ! ******
     ! TEMPORARY UNTIL LOAD ROUTINE INTERFACES HAVE BEEN MODIFIED
@@ -473,16 +482,6 @@ CONTAINS
       END IF
     END IF
     ! ******
-
-    INQUIRE(FILE=TRIM(CSEM_Config), EXIST=CSEM_Config_Exist)
-    IF(.NOT. CSEM_Config_Exist) THEN
-      WRITE(*,*)"Error loading CSEM Algorithm registor file ( CRTM_LifeCycle ): ", TRIM(CSEM_Config), " ....."
-      STOP
-    ENDIF
-    IF(.NOT. IS_CSEM_INIT ) THEN
-       err_stat = CSEM_INIT( TRIM(CSEM_Config))
-       IS_CSEM_INIT = .TRUE.
-    ENDIF
 
     ! Set up
     err_stat = SUCCESS
@@ -642,6 +641,119 @@ CONTAINS
     END IF
 
 
+    ! Load the emissivity model coefficients
+    ! ...Infrared
+    Infrared_Sensor: IF ( ANY(SpcCoeff_IsInfraredSensor(SC)) ) THEN
+      ! ...IR land
+      err_stat = CRTM_IRlandCoeff_Load( &
+                   Default_IRlandCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading IRlandCoeff data from '//TRIM(Default_IRlandCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...IR Water
+      err_stat = CRTM_IRwaterCoeff_Load( &
+                   Default_IRwaterCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading IRwaterCoeff data from '//TRIM(Default_IRwaterCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...IR snow
+      err_stat = CRTM_IRsnowCoeff_Load( &
+                   Default_IRsnowCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading IRsnowCoeff data from '//TRIM(Default_IRsnowCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...IR ice
+      err_stat = CRTM_IRiceCoeff_Load( &
+                   Default_IRiceCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading IRiceCoeff data from '//TRIM(Default_IRiceCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+    END IF Infrared_Sensor
+
+    ! ...Visible
+    Visible_Sensor: IF ( ANY(SpcCoeff_IsVisibleSensor(SC)) ) THEN
+      ! ...VIS land
+      err_stat = CRTM_VISlandCoeff_Load( &
+                   Default_VISlandCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading VISlandCoeff data from '//TRIM(Default_VISlandCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...VIS water
+      err_stat = CRTM_VISwaterCoeff_Load( &
+                   Default_VISwaterCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading VISwaterCoeff data from '//TRIM(Default_VISwaterCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...VIS snow
+      err_stat = CRTM_VISsnowCoeff_Load( &
+                   Default_VISsnowCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading VISsnowCoeff data from '//TRIM(Default_VISsnowCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+      ! ...VIS ice
+      err_stat = CRTM_VISiceCoeff_Load( &
+                   Default_VISiceCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading VISiceCoeff data from '//TRIM(Default_VISiceCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+    END IF Visible_Sensor
+
+    ! ...Microwave
+    Microwave_Sensor: IF ( ANY(SpcCoeff_IsMicrowaveSensor(SC)) ) THEN
+      ! ...MW water
+      err_stat = CRTM_MWwaterCoeff_Load( &
+                   Default_MWwaterCoeff_File, &
+                   Quiet             = Quiet            , &
+                   Process_ID        = Process_ID       , &
+                   Output_Process_ID = Output_Process_ID  )
+      IF ( err_stat /= SUCCESS ) THEN
+        msg = 'Error loading MWwaterCoeff data from '//TRIM(Default_MWwaterCoeff_File)
+        CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+        RETURN
+      END IF
+    END IF Microwave_Sensor
+
+
     ! Load the ChannelInfo structure
     DO n = 1, n_Sensors
       ! ...Allocate the ChannelInfo structure
@@ -741,7 +853,6 @@ CONTAINS
       pid_msg = ''
     END IF
 
-    !CALL CSEM_Destroy
 
     ! Destroy all the ChannelInfo structures
     CALL CRTM_ChannelInfo_Destroy( ChannelInfo )
@@ -751,6 +862,63 @@ CONTAINS
       CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
     END IF
 
+
+    ! Destroy the shared data structure
+    Destroy_Status = CRTM_VISiceCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared VISiceCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_VISsnowCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared VISsnowCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_VISwaterCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared VISwaterCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_VISlandCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared VISlandCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_IRiceCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared IRiceCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_IRsnowCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared IRsnowCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_IRwaterCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared IRwaterCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
+
+    Destroy_Status = CRTM_IRlandCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared IRlandCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
 
     Destroy_Status = CRTM_AerosolCoeff_Destroy( Process_ID = Process_ID )
     IF ( Destroy_Status /= SUCCESS ) THEN
@@ -780,6 +948,12 @@ CONTAINS
       CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
     END IF
 
+    Destroy_Status = CRTM_MWwaterCoeff_Destroy( Process_ID = Process_ID )
+    IF ( Destroy_Status /= SUCCESS ) THEN
+      err_stat = Destroy_Status
+      msg = 'Error deallocating shared MWwaterCoeff data structure'//TRIM(pid_msg)
+      CALL Display_Message( ROUTINE_NAME,TRIM(msg)//TRIM(pid_msg),err_stat )
+    END IF
 
   END FUNCTION CRTM_Destroy
 

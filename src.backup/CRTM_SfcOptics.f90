@@ -11,23 +11,6 @@
 !                       Paul van Delst, CIMSS/SSEC;      paul.vandelst@ssec.wisc.edu
 !                       02-Apr-2004
 !
-! It has been modified replace the CRTM surface modules with the
-! stand-along, expanded and integrated surface RT modling system
-! CSEM (Community Surface Emissivity Models)
-!
-! Since the CRTM surface data structures haven't been modified for
-! the new surface modeling system,"adptor" subroutines are used to
-! convert the surface I/O streams between CRTM and CSEM.
-!
-!
-! CREATION HISTORY:
-!       Written by:     Yong Han,       NOAA/NESDIS;     Yong.Han@noaa.gov
-!                       Quanhua Liu,    QSS Group, Inc;  Quanhua.Liu@noaa.gov
-!                       Paul van Delst, CIMSS/SSEC;      paul.vandelst@ssec.wisc.edu
-!                       02-Apr-2004
-!
-!       Modifed by:     Ming Chen,       UMD-CICS;     ming.chen@noaa.gov
-!                       08-12-2018
 
 MODULE CRTM_SfcOptics
 
@@ -35,96 +18,83 @@ MODULE CRTM_SfcOptics
   ! Environment set up
   ! ------------------
   ! Module use statements
-  USE CSEM_Type_Kinds,               ONLY: fp => CSEM_fp
+  USE Type_Kinds,               ONLY: fp
   USE Message_Handler,          ONLY: SUCCESS, FAILURE, Display_Message
   USE CRTM_Parameters,          ONLY: ZERO, POINT_5, ONE, DEGREES_TO_RADIANS, MAX_N_STOKES
   USE CRTM_SpcCoeff,            ONLY: SC, &
-                                      SpcCoeff_IsSolar,                   &
-                                      SpcCoeff_IsMicrowaveSensor,         &
-                                      SpcCoeff_IsInfraredSensor,          &
-                                      SpcCoeff_IsVisibleSensor,           &
-                                      SpcCoeff_IsUltravioletSensor,       &
-                                      UNPOLARIZED,                        &
-                                      INTENSITY,                          &
-                                      FIRST_STOKES_COMPONENT,             &
-                                      SECOND_STOKES_COMPONENT,            &
-                                      THIRD_STOKES_COMPONENT,             &
-                                      FOURTH_STOKES_COMPONENT,            &
-                                      VL_POLARIZATION,                    &
-                                      HL_POLARIZATION,                    &
-                                      plus45L_POLARIZATION,               &
-                                      minus45L_POLARIZATION,              &
-                                      VL_MIXED_POLARIZATION,              &
-                                      HL_MIXED_POLARIZATION,              &
-                                      RC_POLARIZATION,                    &
+                                      SpcCoeff_IsMicrowaveSensor  , &
+                                      SpcCoeff_IsInfraredSensor   , &
+                                      SpcCoeff_IsVisibleSensor    , &
+                                      SpcCoeff_IsUltravioletSensor, &
+                                      UNPOLARIZED, &
+                                      INTENSITY, &
+                                      FIRST_STOKES_COMPONENT, &
+                                      SECOND_STOKES_COMPONENT, &
+                                      THIRD_STOKES_COMPONENT, &
+                                      FOURTH_STOKES_COMPONENT, &
+                                      VL_POLARIZATION, &
+                                      HL_POLARIZATION, &
+                                      plus45L_POLARIZATION, &
+                                      minus45L_POLARIZATION, &
+                                      VL_MIXED_POLARIZATION, &
+                                      HL_MIXED_POLARIZATION, &
+                                      RC_POLARIZATION, &
                                       LC_POLARIZATION
-
   USE CRTM_Surface_Define,      ONLY: CRTM_Surface_type
   USE CRTM_GeometryInfo_Define, ONLY: CRTM_GeometryInfo_type
-  USE CRTM_SfcOptics_Define,    ONLY: CRTM_SfcOptics_type,                &
-                                      OPERATOR(==),                       &
-                                      CRTM_SfcOptics_Associated,          &
-                                      CRTM_SfcOptics_Destroy   ,          &
+  USE CRTM_SfcOptics_Define,    ONLY: CRTM_SfcOptics_type      , &
+                                      OPERATOR(==)             , &
+                                      CRTM_SfcOptics_Associated, &
+                                      CRTM_SfcOptics_Destroy   , &
                                       CRTM_SfcOptics_Create
-      
-  USE CSEM_LandMW_SfcOptics,    ONLY: CSEM_MWLSOVar_type => iVar_type,    &
-                                      CSEM_Compute_LandMW_SfcOptics,      &
-                                      CSEM_Compute_LandMW_SfcOptics_TL,   &
-                                      CSEM_Compute_LandMW_SfcOptics_AD
-  USE CSEM_WaterMW_SfcOptics,   ONLY: CSEM_MWWSOVar_type => iVar_type,    &
-                                      CSEM_Compute_WaterMW_SfcOptics,     &
-                                      CSEM_Compute_WaterMW_SfcOptics_TL,  &
-                                      CSEM_Compute_WaterMW_SfcOptics_AD
-  USE CSEM_SnowMW_SfcOptics,    ONLY: CSEM_MWSSOVar_type => iVar_type,    &
-                                      CSEM_Compute_SnowMW_SfcOptics,      &
-                                      CSEM_Compute_SnowMW_SfcOptics_TL,   &
-                                      CSEM_Compute_SnowMW_SfcOptics_AD
-  USE CSEM_IceMW_SfcOptics,     ONLY: CSEM_MWISOVar_type => iVar_type,    &
-                                      CSEM_Compute_IceMW_SfcOptics,       &
-                                      CSEM_Compute_IceMW_SfcOptics_TL,    &
-                                      CSEM_Compute_IceMW_SfcOptics_AD
-
-  USE CSEM_LandIR_SfcOptics,    ONLY: CSEM_IRLSOVar_type => iVar_type,    &
-                                      CSEM_Compute_LandIR_SfcOptics,      &
-                                      CSEM_Compute_LandIR_SfcOptics_TL,   &
-                                      CSEM_Compute_LandIR_SfcOptics_AD
-  USE CSEM_WaterIR_SfcOptics,   ONLY: CSEM_IRWSOVar_type => iVar_type,    &
-                                      CSEM_Compute_WaterIR_SfcOptics,     &
-                                      CSEM_Compute_WaterIR_SfcOptics_TL,  &
-                                      CSEM_Compute_WaterIR_SfcOptics_AD
-  USE CSEM_SnowIR_SfcOptics,    ONLY: CSEM_IRSSOVar_type => iVar_type,    &
-                                      CSEM_Compute_SnowIR_SfcOptics,      &
-                                      CSEM_Compute_SnowIR_SfcOptics_TL,   &
-                                      CSEM_Compute_SnowIR_SfcOptics_AD
-  USE CSEM_IceIR_SfcOptics,     ONLY: CSEM_IRISOVar_type => iVar_type,    &
-                                      CSEM_Compute_IceIR_SfcOptics,       &
-                                      CSEM_Compute_IceIR_SfcOptics_TL,    &
-                                      CSEM_Compute_IceIR_SfcOptics_AD
-  USE CSEM_LandVIS_SfcOptics,   ONLY: CSEM_VISLSOVar_type => iVar_type,   &
-                                      CSEM_Compute_LandVIS_SfcOptics,     &
-                                      CSEM_Compute_LandVIS_SfcOptics_TL,  &
-                                      CSEM_Compute_LandVIS_SfcOptics_AD
-  USE CSEM_WaterVIS_SfcOptics,  ONLY: CSEM_VISWSOVar_type => iVar_type,   &
-                                      CSEM_Compute_WaterVIS_SfcOptics,    &
-                                      CSEM_Compute_WaterVIS_SfcOptics_TL, &
-                                      CSEM_Compute_WaterVIS_SfcOptics_AD
-  USE CSEM_SnowVIS_SfcOptics,   ONLY: CSEM_VISSSOVar_type => iVar_type,   &
-                                      CSEM_Compute_SnowVIS_SfcOptics,     &
-                                      CSEM_Compute_SnowVIS_SfcOptics_TL,  &
-                                      CSEM_Compute_SnowVIS_SfcOptics_AD
-  USE CSEM_IceVIS_SfcOptics,    ONLY: CSEM_VISISOVar_type => iVar_type,   &
-                                      CSEM_Compute_IceVIS_SfcOptics,      &
-                                      CSEM_Compute_IceVIS_SfcOptics_TL,   &
-                                      CSEM_Compute_IceVIS_SfcOptics_AD
-     
- 
-  USE CRTM_GeometryInfo_Define, ONLY: CRTM_GeometryInfo_type,             &
-                                      CRTM_GeometryInfo_GetValue
-      
-  USE CSEM_Define
-  USE CSEM_Model_Manager
-     
-     
+  USE CRTM_MW_Land_SfcOptics,   ONLY: MWLSOVar_type => iVar_type, &
+                                      Compute_MW_Land_SfcOptics, &
+                                      Compute_MW_Land_SfcOptics_TL, &
+                                      Compute_MW_Land_SfcOptics_AD
+  USE CRTM_MW_Water_SfcOptics,  ONLY: MWWSOVar_type => iVar_type   , &
+                                      Compute_MW_Water_SfcOptics   , &
+                                      Compute_MW_Water_SfcOptics_TL, &
+                                      Compute_MW_Water_SfcOptics_AD
+  USE CRTM_MW_Snow_SfcOptics,   ONLY: MWSSOVar_type => iVar_type, &
+                                      Compute_MW_Snow_SfcOptics, &
+                                      Compute_MW_Snow_SfcOptics_TL, &
+                                      Compute_MW_Snow_SfcOptics_AD
+  USE CRTM_MW_Ice_SfcOptics,    ONLY: MWISOVar_type => iVar_type, &
+                                      Compute_MW_Ice_SfcOptics, &
+                                      Compute_MW_Ice_SfcOptics_TL, &
+                                      Compute_MW_Ice_SfcOptics_AD
+  USE CRTM_IR_Land_SfcOptics,   ONLY: IRLSOVar_type => iVar_type, &
+                                      Compute_IR_Land_SfcOptics, &
+                                      Compute_IR_Land_SfcOptics_TL, &
+                                      Compute_IR_Land_SfcOptics_AD
+  USE CRTM_IR_Water_SfcOptics,  ONLY: IRWSOVar_type => iVar_type, &
+                                      Compute_IR_Water_SfcOptics, &
+                                      Compute_IR_Water_SfcOptics_TL, &
+                                      Compute_IR_Water_SfcOptics_AD
+  USE CRTM_IR_Snow_SfcOptics,   ONLY: IRSSOVar_type => iVar_type, &
+                                      Compute_IR_Snow_SfcOptics, &
+                                      Compute_IR_Snow_SfcOptics_TL, &
+                                      Compute_IR_Snow_SfcOptics_AD
+  USE CRTM_IR_Ice_SfcOptics,    ONLY: IRISOVar_type => iVar_type, &
+                                      Compute_IR_Ice_SfcOptics, &
+                                      Compute_IR_Ice_SfcOptics_TL, &
+                                      Compute_IR_Ice_SfcOptics_AD
+  USE CRTM_VIS_Land_SfcOptics,  ONLY: VISLSOVar_type => iVar_type, &
+                                      Compute_VIS_Land_SfcOptics, &
+                                      Compute_VIS_Land_SfcOptics_TL, &
+                                      Compute_VIS_Land_SfcOptics_AD
+  USE CRTM_VIS_Water_SfcOptics, ONLY: VISWSOVar_type => iVar_type, &
+                                      Compute_VIS_Water_SfcOptics, &
+                                      Compute_VIS_Water_SfcOptics_TL, &
+                                      Compute_VIS_Water_SfcOptics_AD
+  USE CRTM_VIS_Snow_SfcOptics,  ONLY: VISSSOVar_type => iVar_type, &
+                                      Compute_VIS_Snow_SfcOptics, &
+                                      Compute_VIS_Snow_SfcOptics_TL, &
+                                      Compute_VIS_Snow_SfcOptics_AD
+  USE CRTM_VIS_Ice_SfcOptics,   ONLY: VISISOVar_type => iVar_type, &
+                                      Compute_VIS_Ice_SfcOptics, &
+                                      Compute_VIS_Ice_SfcOptics_TL, &
+                                      Compute_VIS_Ice_SfcOptics_AD
   ! Disable implicit typing
   IMPLICIT NONE
 
@@ -148,12 +118,9 @@ MODULE CRTM_SfcOptics
   ! -----------------
   ! Module parameters
   ! -----------------
-  CHARACTER(*), PARAMETER :: MODULE_VERSION_ID = &
-  '$Id: CRTM_SfcOptics.f90 21141 2012-09-14 17:40:43Z paul.vandelst@noaa.gov &'
   ! Message length
   INTEGER, PARAMETER :: ML = 256
 
-  LOGICAL :: COM_CRTM_CSEM = .FALSE.
 
   ! --------------------------------------
   ! Structure definition to hold forward
@@ -162,24 +129,23 @@ MODULE CRTM_SfcOptics
   TYPE :: iVar_type
     PRIVATE
     ! Microwave
-    TYPE(CSEM_MWLSOVar_type)  ::  CSEM_MWLSOV  ! Land
-    TYPE(CSEM_MWWSOVar_type)  ::  CSEM_MWWSOV  ! Water
-    TYPE(CSEM_MWSSOVar_type)  ::  CSEM_MWSSOV  ! Snow
-    TYPE(CSEM_MWISOVar_type)  ::  CSEM_MWISOV  ! Ice
+    TYPE(MWLSOVar_type)  :: MWLSOV ! Land
+    TYPE(MWWSOVar_type)  :: MWWSOV ! Water
+    TYPE(MWSSOVar_type)  :: MWSSOV ! Snow
+    TYPE(MWISOVar_type)  :: MWISOV ! Ice
     ! Infrared
-    TYPE(CSEM_IRLSOVar_type)  ::  CSEM_IRLSOV  ! Land
-    TYPE(CSEM_IRWSOVar_type)  ::  CSEM_IRWSOV  ! Water
-    TYPE(CSEM_IRSSOVar_type)  ::  CSEM_IRSSOV  ! Snow
-    TYPE(CSEM_IRISOVar_type)  ::  CSEM_IRISOV  ! Ice
+    TYPE(IRLSOVar_type)  :: IRLSOV ! Land
+    TYPE(IRWSOVar_type)  :: IRWSOV ! Water
+    TYPE(IRSSOVar_type)  :: IRSSOV ! Snow
+    TYPE(IRISOVar_type)  :: IRISOV ! Ice
     ! Visible
-    TYPE(CSEM_VISLSOVar_type) ::  CSEM_VISLSOV ! Land
-    TYPE(CSEM_VISWSOVar_type) ::  CSEM_VISWSOV ! Water
-    TYPE(CSEM_VISSSOVar_type) ::  CSEM_VISSSOV ! Snow
-    TYPE(CSEM_VISISOVar_type) ::  CSEM_VISISOV ! Ice
+    TYPE(VISLSOVar_type) :: VISLSOV ! Land
+    TYPE(VISWSOVar_type) :: VISWSOV ! Water
+    TYPE(VISSSOVar_type) :: VISSSOV ! Snow
+    TYPE(VISISOVar_type) :: VISISOV ! Ice
   END TYPE iVar_type
 
-  TYPE(CSEM_Model_ID)  :: CSEM_Model
- 
+
 CONTAINS
 
 
@@ -501,14 +467,7 @@ CONTAINS
     REAL(fp), DIMENSION(SfcOptics%n_Angles,MAX_N_STOKES) :: Direct_Reflectivity
     INTEGER :: Polarization
 
-    TYPE(CSEM_Land_Surface)  :: CSEM_Land
-    TYPE(CSEM_Snow_Surface)  :: CSEM_Snow
-    TYPE(CSEM_Water_Surface) :: CSEM_Water
-    TYPE(CSEM_Ice_Surface)   :: CSEM_Ice
-    TYPE(CSEM_Options_Type)  :: CSEM_Options
 
-    TYPE(CSEM_SfcOptics_Type):: CSEM_SfcOptics
-   
     ! ------
     ! Set up
     ! ------
@@ -521,48 +480,7 @@ CONTAINS
     Reflectivity = ZERO
     Direct_Reflectivity = ZERO
 
-    Error_Status = CRTM_CSEM_Input_Adaptor( &
-                   Surface,     &  ! Input
-                   CSEM_Land,   &  ! Output
-                   CSEM_Water,  &  ! Output
-                   CSEM_Snow,   &  ! Output
-                   CSEM_Ice)    
 
-    ! Data stream from CRTM to CSEM
-    CALL CSEM_Options%SensorObs%init(size(Surface%SensorData%Tb))
-    CALL CSEM_SfcOptics%init(N_Angles=nZ)
-
-    CSEM_SfcOptics%Frequency     =    SC(SensorIndex)%Frequency(ChannelIndex)
-    CSEM_SfcOptics%Wavenumber    =    SC(SensorIndex)%Wavenumber(ChannelIndex)
-    CSEM_SfcOptics%Is_Solar      =    SpcCoeff_IsSolar(SC(SensorIndex), ChannelIndex=ChannelIndex)
-    CSEM_SfcOptics%Angle(1:nZ)   =    SfcOptics%Angle(1:nZ)
-    CSEM_SfcOptics%Weight(1:nZ)  =    SfcOptics%Weight(1:nZ)
-
-    CSEM_Options%SensorObs%Sensor_ID =  TRIM(SC(SensorIndex)%Sensor_ID)
-
-    CALL CRTM_GeometryInfo_GetValue ( &
-         GeometryInfo,                                                      &
-         Longitude               =    CSEM_Options%GeoInfo%Longitude,       &
-         Latitude                =    CSEM_Options%GeoInfo%Latitude,        &
-         Month                   =    CSEM_Options%GeoInfo%Month,           &
-         Sensor_Scan_Angle       =    CSEM_SfcOptics%Sensor_Scan_Angle,     &
-         Sensor_Zenith_Angle     =    CSEM_SfcOptics%Sensor_Zenith_Angle,   &
-         Sensor_Azimuth_Angle    =    CSEM_SfcOptics%Sensor_Azimuth_Angle,  &
-         Source_Zenith_Angle     =    CSEM_SfcOptics%Source_Zenith_Angle,   &
-         Source_Azimuth_Angle    =    CSEM_SfcOptics%Source_Azimuth_Angle)
-
-    IF(CSEM_Options%SensorObs%Is_Allocated) THEN
-         CSEM_Options%SensorObs%Tb = Surface%SensorData%Tb
-         CSEM_Options%SensorObs%Channel_Frequency=SC(SensorIndex)%Frequency
-         CSEM_Options%SensorObs%Channel_Polarization=SC(SensorIndex)%Polarization
-         !CALL Set_Ref_Channel(CSEM_Options%SensorObs)
-    END IF
-    
-    CSEM_Options%Atmos%Transmittance = SfcOptics%Transmittance
-    !CSEM_Options%Atmos%Transmittance = 0.6_fp
-    
-    
-    
       !##########################################################################
       !##########################################################################
       !##                                                                      ##
@@ -579,30 +497,22 @@ CONTAINS
         Microwave_Land: IF( Surface%Land_Coverage > ZERO) THEN
 
           ! Compute the surface optics
-          CSEM_Model = Inq_Model_Option("MW_LAND") 
-          !CSEM_Model%NAME = "TELSEM_ATLAS"
-          !CALL SET_CSEM_Model(CSEM_Model)
-          Error_Status = CSEM_Compute_LandMW_SfcOptics(  &
-                         CSEM_Land,              &  ! Input
-                         CSEM_SfcOptics,         &  ! output
-                         CSEM_Options,           &  ! input
-                         iVar%CSEM_MWLSOV   )       ! Output
-
-          IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Land',CSEM_SfcOptics%Emissivity(1,1:2)
-          END IF
+          Error_Status = Compute_MW_Land_SfcOptics( &
+                           Surface     , &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics     )  ! In/Output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW land SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
+
           ! Accumulate the surface optics properties
           ! based on land coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1:2)           =  CSEM_SfcOptics%Emissivity(i,1:2)         *  Surface%Land_Coverage
-             Reflectivity(i,1:2,i,1:2)   =  CSEM_SfcOptics%Reflectivity(i,1:2,i,1:2) *  Surface%Land_Coverage
-          END DO
+          Emissivity(1:nZ,1:2)            = SfcOptics%Emissivity(1:nZ,1:2)            * Surface%Land_Coverage
+          Reflectivity(1:nZ,1:2,1:nZ,1:2) = SfcOptics%Reflectivity(1:nZ,1:2,1:nZ,1:2) * Surface%Land_Coverage
 
         END IF Microwave_Land
 
@@ -611,34 +521,29 @@ CONTAINS
         ! Microwave WATER emissivity/reflectivity
         ! ---------------------------------------
         Microwave_Water: IF( Surface%Water_Coverage > ZERO ) THEN
-          CSEM_Model = Inq_Model_Option("MW_WATER") 
-          !CSEM_Model%NAME = "NESDIS_FASTEM_V6"
-          !CALL SET_CSEM_Model(CSEM_Model)
 
           ! Compute the surface optics
-          Error_Status =  CSEM_Compute_WaterMW_SfcOptics(  &
-                          CSEM_Water,                      &  ! Input
-                          CSEM_SfcOptics,                  &  ! output
-                          CSEM_Options,ivar%CSEM_MWWSOV   )    ! input
-          IF(COM_CRTM_CSEM) THEN
-            print*, TRIM(CSEM_Model%NAME)
-            WRITE(*,*)'CSEM_Water',CSEM_SfcOptics%Emissivity(1,1:4)
-          END IF
-         IF ( Error_Status /= SUCCESS ) THEN
+          Error_Status = Compute_MW_Water_SfcOptics( &
+                           Surface     , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics   , &  ! In/Output
+                           iVar%MWWSOV   )  ! Internal variable output
+          IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW water SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
+
+
           ! Accumulate the surface optics properties
           ! based on water coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1:4)           =  Emissivity(i,1:4)         +  &
-                 CSEM_SfcOptics%Emissivity(i,1:4)         *  Surface%Water_Coverage
-             Reflectivity(i,1:4,i,1:4)   =  Reflectivity(i,1:4,i,1:4) +  &
-                 CSEM_SfcOptics%Reflectivity(i,1:4,i,1:4) *  Surface%Water_Coverage
-          END DO
-
+          Emissivity(1:nZ,1:2) = Emissivity(1:nZ,1:2) + &
+            (SfcOptics%Emissivity(1:nZ,1:2)*Surface%Water_Coverage)
+          Reflectivity(1:nZ,1:2,1:nZ,1:2) = Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            (SfcOptics%Reflectivity(1:nZ,1:2,1:nZ,1:2)*Surface%Water_Coverage)
 
          END IF Microwave_Water
 
@@ -647,15 +552,14 @@ CONTAINS
         ! Microwave SNOW emissivity/reflectivity
         ! --------------------------------------
         Microwave_Snow: IF( Surface%Snow_Coverage > ZERO ) THEN
-          ! Compute the surface optics
-        Error_Status = CSEM_Compute_SnowMW_SfcOptics( &
-                       CSEM_Snow,             &  ! Input
-                       CSEM_SfcOptics,        &  ! output
-                       CSEM_Options   )          ! intput
-          IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Snow',CSEM_SfcOptics%Emissivity(1,1:4)
-          END IF
 
+          ! Compute the surface optics
+          Error_Status = Compute_MW_Snow_SfcOptics( &
+                           Surface     , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics     )  ! In/Output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW snow SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -665,13 +569,11 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1:2)           =  Emissivity(i,1:2)         +  &
-                 CSEM_SfcOptics%Emissivity(i,1:2)         *  Surface%Snow_Coverage
-             Reflectivity(i,1:2,i,1:2)   =  Reflectivity(i,1:2,i,1:2) +  &
-                 CSEM_SfcOptics%Reflectivity(i,1:2,i,1:2) *  Surface%Snow_Coverage
-          END DO
-  
+          Emissivity(1:nZ,1:2) = Emissivity(1:nZ,1:2) + &
+            (SfcOptics%Emissivity(1:nZ,1:2)*Surface%Snow_Coverage)
+          Reflectivity(1:nZ,1:2,1:nZ,1:2) = Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            (SfcOptics%Reflectivity(1:nZ,1:2,1:nZ,1:2)*Surface%Snow_Coverage)
+
         END IF Microwave_Snow
 
 
@@ -679,17 +581,14 @@ CONTAINS
         ! Microwave ICE emissivity/reflectivity
         ! -------------------------------------
         Microwave_Ice: IF( Surface%Ice_Coverage > ZERO ) THEN
-         ! Compute the surface optics
 
-         Error_Status = CSEM_Compute_IceMW_SfcOptics(  &
-                        CSEM_Ice,              &  ! Input
-                        CSEM_SfcOptics,        &  ! Output
-                        CSEM_Options   )          ! input
-         IF(COM_CRTM_CSEM) THEN
-             !WRITE(*,*)'CSEM_Ice',CSEM_Channel%frequency,CSEM_Geometry(1)%zenith_angle
-             WRITE(*,*)'CSEM_Ice',CSEM_SfcOptics%Emissivity(i,1:2)
-          END IF
-
+          ! Compute the surface optics
+          Error_Status = Compute_MW_Ice_SfcOptics( &
+                           Surface     , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics     )  ! In/Output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW ice SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -699,13 +598,11 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1:2)           =  Emissivity(i,1:2)         +  &
-                 CSEM_SfcOptics%Emissivity(i,1:2)         *  Surface%Ice_Coverage
-             Reflectivity(i,1:2,i,1:2)   =  Reflectivity(i,1:2,i,1:2) +  &
-                 CSEM_SfcOptics%Reflectivity(i,1:2,i,1:2) *  Surface%Ice_Coverage
-          END DO
-   
+          Emissivity(1:nZ,1:2)            = Emissivity(1:nZ,1:2) + &
+                                            (SfcOptics%Emissivity(1:nZ,1:2)*Surface%Ice_Coverage)
+          Reflectivity(1:nZ,1:2,1:nZ,1:2) = Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+                                            (SfcOptics%Reflectivity(1:nZ,1:2,1:nZ,1:2)*Surface%Ice_Coverage)
+
         END IF Microwave_Ice
 
 
@@ -857,67 +754,58 @@ CONTAINS
         ! Infrared LAND emissivity/reflectivity
         ! -------------------------------------
         Infrared_Land: IF( Surface%Land_Coverage > ZERO ) THEN
+
           ! Compute the surface optics
-
-          Error_Status = CSEM_Compute_LandIR_SfcOptics ( &
-                         CSEM_Land,              &  ! Input
-                         CSEM_SfcOptics,         &  ! Input
-                         CSEM_Options  )            ! Output
-          IF(COM_CRTM_CSEM) THEN
-             !WRITE(*,*)'CSEM_Land',CSEM_Channel%wavenumber,CSEM_Geometry(1)%zenith_angle
-             WRITE(*,*)'CSEM_Land',CSEM_SfcOptics%Emissivity(1,1:2)
-          END IF
-
-         IF ( Error_Status /= SUCCESS ) THEN
+          Error_Status = Compute_IR_Land_SfcOptics( &
+                           Surface     , &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics   , &  ! In/Output
+                           iVar%IRLSOV   )  ! Internal variable output
+          IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR land SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-  
+
           ! Accumulate the surface optics properties
           ! based on land coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1)            =  CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Land_Coverage
-             Reflectivity(i,1,i,1)      =  CSEM_SfcOptics%Reflectivity(i,1,i,1)     *  Surface%Land_Coverage
-             Direct_Reflectivity(i,1)   =  CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Land_Coverage
-          END DO
- 
-         END IF Infrared_Land
+          Emissivity(1:nZ,1)          = SfcOptics%Emissivity(1:nZ,1)          * Surface%Land_Coverage
+          Reflectivity(1:nZ,1,1:nZ,1) = SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Land_Coverage
+          Direct_Reflectivity(1:nZ,1) = SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Land_Coverage
+        END IF Infrared_Land
 
 
         ! --------------------------------------
         ! Infrared WATER emissivity/reflectivity
         ! --------------------------------------
         Infrared_Water: IF( Surface%Water_Coverage > ZERO ) THEN
-          ! Compute the surface optics
-          !CALL SET_AlgID("IR_WATER", NESDIS_IRW_Nalli)
-          Error_Status = CSEM_Compute_WaterIR_SfcOptics ( &
-                         CSEM_Water,                      &  ! Input
-                         CSEM_SfcOptics,                  &  ! Input
-                         CSEM_Options,ivar%CSEM_IRWSOV   )   ! Output
-          IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Water,wavenumber, angle',CSEM_SfcOptics%wavenumber,CSEM_SfcOptics%Angle
-              WRITE(*,*)'CSEM_Water,Emissivity',CSEM_SfcOptics%Emissivity(1,1:1)
-         END IF
 
+          ! Compute the surface optics
+          Error_Status = Compute_IR_Water_SfcOptics( &
+                           Surface     , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics   , &  ! In/Output
+                           iVar%IRWSOV   )  ! Internal variable output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR water SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
- 
+
           ! Accumulate the surface optics properties
           ! based on water coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Water_Coverage
-             Reflectivity(i,1,i,1)      =  Reflectivity(i,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(i,1,i,1)     *  Surface%Water_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Water_Coverage
-          END DO
+          Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+            ( SfcOptics%Emissivity(1:nZ,1) * Surface%Water_Coverage )
+          Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+            ( SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Water_Coverage )
+          Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+            ( SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Water_Coverage )
+
         END IF Infrared_Water
 
 
@@ -925,16 +813,14 @@ CONTAINS
         ! Infrared SNOW emissivity/reflectivity
         ! -------------------------------------
         Infrared_Snow: IF( Surface%Snow_Coverage > ZERO ) THEN
-        
-          ! Compute the surface optics
-          Error_Status = CSEM_Compute_SnowIR_SfcOptics ( &
-                         CSEM_Snow,               &  ! Input
-                         CSEM_SfcOptics,          &  ! Input
-                         CSEM_Options  )             ! input
-          IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Snow',CSEM_SfcOptics%Emissivity(1,1:2)
-          END IF
 
+          ! Compute the surface optics
+          Error_Status = Compute_IR_Snow_SfcOptics( &
+                           Surface     , &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics   , &  ! In/Output
+                           iVar%IRSSOV   )  ! Internal variable output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR snow SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -944,14 +830,12 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Snow_Coverage
-             Reflectivity(i,1,i,1)      =  Reflectivity(i,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(i,1,i,1)     *  Surface%Snow_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Snow_Coverage
-          END DO
+          Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+            (SfcOptics%Emissivity(1:nZ,1)*Surface%Snow_Coverage)
+          Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+            (SfcOptics%Reflectivity(1:nZ,1,1:nZ,1)*Surface%Snow_Coverage)
+          Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+            ( SfcOptics%Direct_Reflectivity(1:nZ,1)*Surface%Snow_Coverage)
 
         ENDIF Infrared_Snow
 
@@ -960,16 +844,14 @@ CONTAINS
         ! Infrared ICE emissivity/reflectivity
         ! ------------------------------------
         Infrared_Ice: IF( Surface%Ice_Coverage > ZERO ) THEN
-         ! Compute the surface optics
 
-         Error_Status = CSEM_Compute_IceIR_SfcOptics ( &
-                        CSEM_Ice,              &  ! Input
-                        CSEM_SfcOptics,        &  ! output
-                        CSEM_Options  )           ! input
-          IF(COM_CRTM_CSEM) THEN
-            WRITE(*,*)'CSEM_Ice',CSEM_SfcOptics%Emissivity(1,1:2)
-          END IF
-
+          ! Compute the surface optics
+          Error_Status = Compute_IR_Ice_SfcOptics( &
+                           Surface     , &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics   , &  ! In/Output
+                           iVar%IRISOV   )  ! Internal variable output
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR ice SfcOptics at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -979,15 +861,13 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on Ice coverage fraction
-          DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Ice_Coverage
-             Reflectivity(i,1,i,1)      =  Reflectivity(i,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(i,1,i,1)     *  Surface%Ice_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Ice_Coverage
-          END DO
-   
+          Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+            (SfcOptics%Emissivity(1:nZ,1) * Surface%Ice_Coverage)
+          Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+            (SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Ice_Coverage)
+          Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+            ( SfcOptics%Direct_Reflectivity(1:nZ,1)*Surface%Ice_Coverage)
+
         END IF Infrared_Ice
 
 
@@ -1009,9 +889,7 @@ CONTAINS
       !##########################################################################
       !##########################################################################
 
-!old      ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
-      ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex)).or. &
-          SpcCoeff_IsUltravioletSensor( SC(SensorIndex)) ) THEN
+      ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
 
         mth_Azi_Test: IF( SfcOptics%mth_Azi == 0 ) THEN
 
@@ -1023,17 +901,14 @@ CONTAINS
           ! Visible LAND emissivity/reflectivity
           ! -------------------------------------
           Visible_Land: IF( Surface%Land_Coverage > ZERO ) THEN
-            ! Compute the surface optics
-            Error_Status = CSEM_Compute_LandVIS_SfcOptics(    &
-                           CSEM_Land,                 &  ! Input
-                           CSEM_SfcOptics,            &  ! output
-                           CSEM_Options  )               ! input
-            IF(COM_CRTM_CSEM) THEN
-              WRITE(*,*)'CSEM_Land',CSEM_SfcOptics%wavenumber,CSEM_SfcOptics%Angle
-              WRITE(*,*)'CSEM_Land',CSEM_SfcOptics%Direct_Reflectivity(1,1)
-              END IF
-             
 
+            ! Compute the surface optics
+            Error_Status = Compute_VIS_Land_SfcOptics( &
+                             Surface     , &  ! Input
+                             SensorIndex , &  ! Input
+                             ChannelIndex, &  ! Input
+                             SfcOptics   , &  ! In/Output
+                             iVar%VISLSOV  )  ! Internal variable output
             IF ( Error_Status /= SUCCESS ) THEN
               WRITE( Message,'("Error computing VIS land SfcOptics at ", &
                               &"channel index ",i0)' ) ChannelIndex
@@ -1043,11 +918,9 @@ CONTAINS
 
             ! Accumulate the surface optics properties
             ! based on land coverage fraction
-            DO i = 1, nZ
-               Emissivity(i,1)            =  CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Land_Coverage
-               Reflectivity(1:nZ,1,i,1)   =  CSEM_SfcOptics%Reflectivity(1:nZ,1,i,1)  *  Surface%Land_Coverage
-               Direct_Reflectivity(i,1)   =  CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Land_Coverage
-            END DO
+            Emissivity(1:nZ,1)          = SfcOptics%Emissivity(1:nZ,1)          * Surface%Land_Coverage
+            Reflectivity(1:nZ,1,1:nZ,1) = SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Land_Coverage
+            Direct_Reflectivity(1:nZ,1) = SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Land_Coverage
 
           END IF Visible_Land
 
@@ -1058,15 +931,12 @@ CONTAINS
           Visible_Water: IF( Surface%Water_Coverage > ZERO ) THEN
 
             ! Compute the surface optics
-            Error_Status = CSEM_Compute_WaterVIS_SfcOptics (   &
-                           CSEM_Water,                         &  ! Input
-                           CSEM_SfcOptics,                     &  ! output
-                           CSEM_Options,ivar%CSEM_VISWSOV  )      ! input
-            IF(COM_CRTM_CSEM) THEN
-              WRITE(*,*)'CSEM_Water',CSEM_SfcOptics%wavenumber,CSEM_SfcOptics%Angle
-              WRITE(*,*)'CSEM_Water',CSEM_SfcOptics%Direct_Reflectivity(1,1) 
-            END IF
-
+            Error_Status = Compute_VIS_Water_SfcOptics( &
+                             Surface     , &  ! Input
+                             SensorIndex , &  ! Input
+                             ChannelIndex, &  ! Input
+                             SfcOptics   , &  ! In/Output
+                             iVar%VISWSOV  )  ! Internal variable output
             IF ( Error_Status /= SUCCESS ) THEN
               WRITE( Message,'("Error computing VIS water SfcOptics at ",&
                               &"channel index ",i0)' ) ChannelIndex
@@ -1076,14 +946,12 @@ CONTAINS
 
             ! Accumulate the surface optics properties
             ! based on water coverage fraction
-            DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Water_Coverage
-             Reflectivity(1:nZ,1,i,1)      =  Reflectivity(1:nZ,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(1:nZ,1,i,1)     *  Surface%Water_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Water_Coverage
-           END DO
+            Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+              ( SfcOptics%Emissivity(1:nZ,1) * Surface%Water_Coverage )
+            Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+              ( SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Water_Coverage )
+            Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+              ( SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Water_Coverage )
 
           END IF Visible_Water
 
@@ -1094,15 +962,12 @@ CONTAINS
           Visible_Snow: IF( Surface%Snow_Coverage > ZERO ) THEN
 
             ! Compute the surface optics
-            Error_Status = CSEM_Compute_SnowVIS_SfcOptics (   &
-                           CSEM_Snow,                 &  ! Input
-                           CSEM_SfcOptics,            &  ! output
-                           CSEM_Options  )               ! input
-            IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Snow',CSEM_SfcOptics%wavenumber,CSEM_SfcOptics%Angle
-             WRITE(*,*)'CSEM_Snow',CSEM_SfcOptics%Emissivity(1,1:2)
-            END IF
-
+            Error_Status = Compute_VIS_Snow_SfcOptics( &
+                             Surface     , &  ! Input
+                             SensorIndex , &  ! Input
+                             ChannelIndex, &  ! Input
+                             SfcOptics   , &  ! In/Output
+                             iVar%VISSSOV  )  ! Internal variable output
             IF ( Error_Status /= SUCCESS ) THEN
               WRITE( Message,'("Error computing VIS snow SfcOptics at ",&
                               &"channel index ",i0)' ) ChannelIndex
@@ -1112,14 +977,13 @@ CONTAINS
 
             ! Accumulate the surface optics properties
             ! based on snow coverage fraction
-            DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Snow_Coverage
-             Reflectivity(1:nZ,1,i,1)      =  Reflectivity(1:nZ,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(1:nZ,1,i,1)     *  Surface%Snow_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Snow_Coverage
-            END DO
+            Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+              (SfcOptics%Emissivity(1:nZ,1)*Surface%Snow_Coverage)
+            Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+              (SfcOptics%Reflectivity(1:nZ,1,1:nZ,1)*Surface%Snow_Coverage)
+            Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+              ( SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Snow_Coverage )
+
           ENDIF Visible_Snow
 
 
@@ -1128,16 +992,13 @@ CONTAINS
           ! -----------------------------------
           Visible_Ice: IF( Surface%Ice_Coverage > ZERO ) THEN
 
-           ! Compute the surface optics
-            Error_Status = CSEM_Compute_IceVIS_SfcOptics (   &
-                           CSEM_Ice,                 &  ! Input
-                           CSEM_SfcOptics,           &  ! output
-                           CSEM_Options  )              ! input
-          IF(COM_CRTM_CSEM) THEN
-             WRITE(*,*)'CSEM_Ice',CSEM_SfcOptics%wavenumber,CSEM_SfcOptics%Angle
-             WRITE(*,*)'CSEM_Ice',CSEM_SfcOptics%Emissivity(1,1:2)
-          END IF
-
+            ! Compute the surface optics
+            Error_Status = Compute_VIS_Ice_SfcOptics( &
+                             Surface     , &  ! Input
+                             SensorIndex , &  ! Input
+                             ChannelIndex, &  ! Input
+                             SfcOptics   , &  ! In/Output
+                             iVar%VISISOV  )  ! Internal variable output
             IF ( Error_Status /= SUCCESS ) THEN
               WRITE( Message,'("Error computing VIS ice SfcOptics at ",&
                               &"channel index ",i0)' ) ChannelIndex
@@ -1147,15 +1008,12 @@ CONTAINS
 
             ! Accumulate the surface optics properties
             ! based on Ice coverage fraction
-      
-            DO i = 1, nZ
-             Emissivity(i,1)            =  Emissivity(i,1)           +   &
-                 CSEM_SfcOptics%Emissivity(i,1)           *  Surface%Ice_Coverage
-             Reflectivity(1:nZ,1,i,1)      =  Reflectivity(1:nZ,1,i,1)     +   &
-                 CSEM_SfcOptics%Reflectivity(1:nZ,1,i,1)     *  Surface%Ice_Coverage
-             Direct_Reflectivity(i,1)   =  Direct_Reflectivity(i,1)  +   &
-                 CSEM_SfcOptics%Direct_Reflectivity(i,1)  *  Surface%Ice_Coverage
-            END DO
+            Emissivity(1:nZ,1) = Emissivity(1:nZ,1) + &
+              (SfcOptics%Emissivity(1:nZ,1) * Surface%Ice_Coverage)
+            Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1) + &
+              (SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Ice_Coverage)
+            Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1) + &
+              ( SfcOptics%Direct_Reflectivity(1:nZ,1) * Surface%Ice_Coverage )
 
           END IF Visible_Ice
 
@@ -1163,15 +1021,15 @@ CONTAINS
           ! -----------------------
           ! Assign the final result
           ! -----------------------
-          SfcOptics%Emissivity(1:nZ,1)          =  Emissivity(1:nZ,1)
-          SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) =  Reflectivity(1:nZ,1,1:nZ,1)
-          SfcOptics%Direct_Reflectivity(1:nZ,1) =  Direct_Reflectivity(1:nZ,1)
+          SfcOptics%Emissivity(1:nZ,1)          = Emissivity(1:nZ,1)
+          SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) = Reflectivity(1:nZ,1,1:nZ,1)
+          SfcOptics%Direct_Reflectivity(1:nZ,1) = Direct_Reflectivity(1:nZ,1)
 
         ELSE
 
-          SfcOptics%Emissivity(1:nZ,1)          =  ZERO
-          SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) =  ZERO
-          SfcOptics%Direct_Reflectivity         =  ZERO
+          SfcOptics%Emissivity(1:nZ,1)          = ZERO
+          SfcOptics%Reflectivity(1:nZ,1,1:nZ,1) = ZERO
+          SfcOptics%Direct_Reflectivity         = ZERO
 
         END IF mth_Azi_Test
 
@@ -1340,14 +1198,6 @@ CONTAINS
                         SfcOptics%n_Angles,MAX_N_STOKES) :: Reflectivity_TL
     REAL(fp), DIMENSION(SfcOptics%n_Angles,MAX_N_STOKES) :: Direct_Reflectivity_TL
 
-    TYPE(CSEM_Land_Surface)  :: CSEM_Land_TL
-    TYPE(CSEM_Snow_Surface)  :: CSEM_Snow_TL
-    TYPE(CSEM_Water_Surface) :: CSEM_Water_TL
-    TYPE(CSEM_Ice_Surface)   :: CSEM_Ice_TL
-    TYPE(CSEM_SfcOptics_Type):: CSEM_SfcOptics_TL
-    TYPE(CSEM_Atmosphere_Parameters) :: Atmos_TL 
-
-
     ! ------
     ! Set up
     ! ------
@@ -1359,21 +1209,6 @@ CONTAINS
     Emissivity_TL   = ZERO
     Reflectivity_TL = ZERO
     Direct_Reflectivity_TL = ZERO
-
-    CALL CSEM_SfcOptics_TL%Init(N_Angles=nZ)
-    CSEM_SfcOptics_TL%Frequency   =  SC(SensorIndex)%Frequency(ChannelIndex)
-    CSEM_SfcOptics_TL%Wavenumber  =  SC(SensorIndex)%Wavenumber(ChannelIndex)
-    CSEM_SfcOptics_TL%Is_Solar    =  SpcCoeff_IsSolar(SC(SensorIndex), ChannelIndex=ChannelIndex)
-    CSEM_SfcOptics_TL%Angle(1:nZ) =  SfcOptics%Angle(1:nZ)
-    CSEM_SfcOptics_TL%Weight(1:nZ) =  SfcOptics%Weight(1:nZ)
-
-    Error_Status = CRTM_CSEM_Input_Adaptor( &
-                   Surface_TL,      &  ! Input
-                   CSEM_Land_TL,    &  ! Output
-                   CSEM_Water_TL ,  &  ! Output
-                   CSEM_Snow_TL,    &  ! Output
-                   CSEM_Ice_TL)    
-
 
 
       !##########################################################################
@@ -1392,13 +1227,7 @@ CONTAINS
         Microwave_Land: IF( Surface%Land_Coverage > ZERO) THEN
 
           ! Compute the surface optics
-          Error_Status = CSEM_Compute_LandMW_SfcOptics_TL (     &
-                         CSEM_Land_TL,                  &
-                         CSEM_SfcOptics_TL,                     &
-                         iVar%CSEM_MWLSOV   )          
-          IF(COM_CRTM_CSEM) THEN
-            WRITE(*,*)'CSEM_Land_TL',CSEM_SfcOptics_TL%Emissivity(1,1:4)
-          END IF
+          Error_Status = Compute_MW_Land_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW land SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1408,11 +1237,11 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on land coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1:2)         =  CSEM_SfcOptics_TL%Emissivity(i,1:2)         *  Surface%Land_Coverage
-             Reflectivity_TL(i,1:2,i,1:2) =  CSEM_SfcOptics_TL%Reflectivity(i,1:2,i,1:2) *  Surface%Land_Coverage
-          END DO
-          
+          Emissivity_TL(1:nZ,1:2) = &
+            SfcOptics_TL%Emissivity(1:nZ,1:2)*Surface%Land_Coverage
+          Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) = &
+            SfcOptics_TL%Reflectivity(1:nZ,1:2,1:nZ,1:2)*Surface%Land_Coverage
+
         END IF Microwave_Land
 
 
@@ -1420,22 +1249,16 @@ CONTAINS
         ! Microwave WATER emissivity/reflectivity
         ! ---------------------------------------
         Microwave_Water: IF( Surface%Water_Coverage > ZERO ) THEN
-      
-          Atmos_TL%Transmittance = SfcOptics_TL%Transmittance
 
           ! Compute the surface optics
-          Error_Status =  CSEM_Compute_WaterMW_SfcOptics_TL( &
-                          CSEM_Water_TL                     ,&  ! Input
-                          Atmos_TL                          ,&
-                          CSEM_SfcOptics_TL                 ,&
-                          iVar%CSEM_MWWSOV)                          
-
-          IF(COM_CRTM_CSEM) THEN
-            print*,'CSEM_Water_Surface_TL',CSEM_Water_TL
-            WRITE(*,*)'CSEM_water_TL',CSEM_SfcOptics_TL%Emissivity(1,1:4)
-          END IF
-
-     
+          Error_Status = Compute_MW_Water_SfcOptics_TL( &
+                           SfcOptics   , &  ! Input
+                           Surface_TL  , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics_TL, &  ! In/Output
+                           iVar%MWWSOV   )  ! Internal variable input
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW water SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1445,12 +1268,10 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on water coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1:4)         =   Emissivity_TL(i,1:4)         +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1:4)         *  Surface%Water_Coverage
-             Reflectivity_TL(i,1:4,i,1:4) =   Reflectivity_TL(i,1:4,i,1:4) +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1:4,i,1:4) *  Surface%Water_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1:2) = Emissivity_TL(1:nZ,1:2) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1:2) * Surface%Water_Coverage )
+          Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) = Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1:2,1:nZ,1:2) * Surface%Water_Coverage )
 
         END IF Microwave_Water
 
@@ -1461,7 +1282,7 @@ CONTAINS
         Microwave_Snow: IF( Surface%Snow_Coverage > ZERO ) THEN
 
           ! Compute the surface optics
-          Error_Status = CSEM_Compute_SnowMW_SfcOptics_TL( CSEM_SfcOptics_TL )
+          Error_Status = Compute_MW_Snow_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW snow SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1471,12 +1292,10 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1:2)         =   Emissivity_TL(i,1:2)         +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1:2)         *  Surface%Snow_Coverage
-             Reflectivity_TL(i,1:2,i,1:2) =   Reflectivity_TL(i,1:2,i,1:2) +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1:2,i,1:2) *  Surface%Snow_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1:2) = Emissivity_TL(1:nZ,1:2) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1:2) * Surface%Snow_Coverage )
+          Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) = Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1:2,1:nZ,1:2) * Surface%Snow_Coverage )
 
         ENDIF Microwave_Snow
 
@@ -1488,7 +1307,7 @@ CONTAINS
         Microwave_Ice: IF( Surface%Ice_Coverage > ZERO ) THEN
 
           ! Compute the surface optics
-          Error_Status = CSEM_Compute_IceMW_SfcOptics_TL( CSEM_SfcOptics_TL )
+          Error_Status = Compute_MW_Ice_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW ice SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1498,12 +1317,10 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1:2)         =   Emissivity_TL(i,1:2)         +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1:2)         *  Surface%Ice_Coverage
-             Reflectivity_TL(i,1:2,i,1:2) =   Reflectivity_TL(i,1:2,i,1:2) +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1:2,i,1:2) *  Surface%Ice_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1:2) = Emissivity_TL(1:nZ,1:2) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1:2) * Surface%Ice_Coverage )
+          Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) = Reflectivity_TL(1:nZ,1:2,1:nZ,1:2) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1:2,1:nZ,1:2) * Surface%Ice_Coverage )
 
         ENDIF Microwave_Ice
 
@@ -1660,7 +1477,7 @@ CONTAINS
 
           ! Compute the surface optics
           ! **STUB PROCEDURE**
-          Error_Status = CSEM_Compute_LandIR_SfcOptics_TL( CSEM_SfcOptics_TL )
+          Error_Status = Compute_IR_Land_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR land SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1670,11 +1487,10 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on land coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1)          =  CSEM_SfcOptics_TL%Emissivity(i,1)           *   Surface%Land_Coverage
-             Reflectivity_TL(i,1,i,1)    =  CSEM_SfcOptics_TL%Reflectivity(i,1,i,1)     *   Surface%Land_Coverage
-             Direct_Reflectivity_TL(i,1) =  CSEM_SfcOptics_TL%Direct_Reflectivity(i,1)  *   Surface%Land_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1) = &
+            SfcOptics_TL%Emissivity(1:nZ,1) * Surface%Land_Coverage
+          Reflectivity_TL(1:nZ,1,1:nZ,1) = &
+            SfcOptics_TL%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Land_Coverage
 
         END IF Infrared_Land
 
@@ -1685,13 +1501,15 @@ CONTAINS
         Infrared_Water: IF( Surface%Water_Coverage > ZERO ) THEN
 
           ! Compute the surface optics
-           Error_Status =  CSEM_Compute_WaterIR_SfcOptics_TL(   &
-             CSEM_Water_TL                             ,&  
-             CSEM_SfcOptics_TL, iVar%CSEM_IRWSOV)                         
-          IF(COM_CRTM_CSEM) THEN
-            WRITE(*,*)'CSEM_water_TL',CSEM_SfcOptics_TL%Emissivity(1,1)
-            WRITE(*,*)'CSEM_water_TL',CSEM_SfcOptics_TL%Direct_Reflectivity(1,1)
-          END IF
+          Error_Status = Compute_IR_Water_SfcOptics_TL( &
+                           Surface     , &  ! Input
+                           SfcOptics   , &  ! Input
+                           Surface_TL  , &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           SfcOptics_TL, &  ! In/Output
+                           iVar%IRWSOV   )  ! Internal variable input
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR water SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1701,15 +1519,13 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on water coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1)          =  Emissivity_TL(i,1)           +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1)          *   Surface%Water_Coverage
-             Reflectivity_TL(i,1,i,1)    =  Reflectivity_TL(i,1,i,1)     +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1,i,1)    *   Surface%Water_Coverage
-             Direct_Reflectivity_TL(i,1) =  Direct_Reflectivity_TL(i,1)  +   &
-                 CSEM_SfcOptics_TL%Direct_Reflectivity(i,1) *   Surface%Water_Coverage
-          END DO
-  
+          Emissivity_TL(1:nZ,1) = Emissivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1) * Surface%Water_Coverage )
+          Reflectivity_TL(1:nZ,1,1:nZ,1) = Reflectivity_TL(1:nZ,1,1:nZ,1) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Water_Coverage )
+          Direct_Reflectivity_TL(1:nZ,1) = Direct_Reflectivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Direct_Reflectivity(1:nZ,1) * Surface%Water_Coverage )
+
         END IF Infrared_Water
 
 
@@ -1719,7 +1535,7 @@ CONTAINS
         Infrared_Snow: IF( Surface%Snow_Coverage > ZERO ) THEN
 
           ! Compute the surface optics
-          Error_Status = CSEM_Compute_SnowIR_SfcOptics_TL( CSEM_SfcOptics_TL )
+          Error_Status = Compute_IR_Snow_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR snow SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1729,14 +1545,12 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on snow coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1)          =  Emissivity_TL(i,1)           +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1)          *   Surface%Snow_Coverage
-             Reflectivity_TL(i,1,i,1)    =  Reflectivity_TL(i,1,i,1)     +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1,i,1)    *   Surface%Snow_Coverage
-             Direct_Reflectivity_TL(i,1) =  Direct_Reflectivity_TL(i,1)  +   &
-                 CSEM_SfcOptics_TL%Direct_Reflectivity(i,1) *   Surface%Snow_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1) = Emissivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1) * Surface%Snow_Coverage )
+          Reflectivity_TL(1:nZ,1,1:nZ,1) = Reflectivity_TL(1:nZ,1,1:nZ,1) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Snow_Coverage )
+          Direct_Reflectivity_TL(1:nZ,1) = Direct_Reflectivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Direct_Reflectivity(1:nZ,1) * Surface%Snow_Coverage )
 
         END IF Infrared_Snow
 
@@ -1747,7 +1561,7 @@ CONTAINS
         Infrared_Ice: IF( Surface%Ice_Coverage > ZERO ) THEN
 
           ! Compute the surface optics
-          Error_Status = CSEM_Compute_IceIR_SfcOptics_TL( CSEM_SfcOptics_TL )
+          Error_Status = Compute_IR_Ice_SfcOptics_TL( SfcOptics_TL )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR ice SfcOptics_TL at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -1757,14 +1571,12 @@ CONTAINS
 
           ! Accumulate the surface optics properties
           ! based on Ice coverage fraction
-          DO i = 1, nZ
-             Emissivity_TL(i,1)          =  Emissivity_TL(i,1)           +   &
-                 CSEM_SfcOptics_TL%Emissivity(i,1)          *   Surface%Ice_Coverage
-             Reflectivity_TL(i,1,i,1)    =  Reflectivity_TL(i,1,i,1)     +   &
-                 CSEM_SfcOptics_TL%Reflectivity(i,1,i,1)    *   Surface%Ice_Coverage
-             Direct_Reflectivity_TL(i,1) =  Direct_Reflectivity_TL(i,1)  +   &
-                 CSEM_SfcOptics_TL%Direct_Reflectivity(i,1) *   Surface%Ice_Coverage
-          END DO
+          Emissivity_TL(1:nZ,1) = Emissivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Emissivity(1:nZ,1) * Surface%Ice_Coverage )
+          Reflectivity_TL(1:nZ,1,1:nZ,1) = Reflectivity_TL(1:nZ,1,1:nZ,1) + &
+            ( SfcOptics_TL%Reflectivity(1:nZ,1,1:nZ,1) * Surface%Ice_Coverage )
+          Direct_Reflectivity_TL(1:nZ,1) = Direct_Reflectivity_TL(1:nZ,1) + &
+            ( SfcOptics_TL%Direct_Reflectivity(1:nZ,1) * Surface%Ice_Coverage )
 
         END IF Infrared_Ice
 
@@ -1785,9 +1597,7 @@ CONTAINS
       !##########################################################################
       !##########################################################################
 
-      !ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
-      ELSE IF (SpcCoeff_IsVisibleSensor(SC(SensorIndex)).or. &
-           SpcCoeff_IsUltravioletSensor(SC(SensorIndex))) THEN
+      ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
 
 
         ! -------------------
@@ -1964,16 +1774,6 @@ CONTAINS
     REAL(fp), DIMENSION(SfcOptics%n_Angles,MAX_N_STOKES, &
                         SfcOptics%n_Angles,MAX_N_STOKES) :: Reflectivity_AD
     REAL(fp), DIMENSION(SfcOptics%n_Angles,MAX_N_STOKES) :: Direct_Reflectivity_AD
-    
-    TYPE(CSEM_Land_Surface)  :: CSEM_Land_AD
-    TYPE(CSEM_Snow_Surface)  :: CSEM_Snow_AD
-    TYPE(CSEM_Water_Surface) :: CSEM_Water_AD
-    TYPE(CSEM_Ice_Surface)   :: CSEM_Ice_AD
-    TYPE(CSEM_SfcOptics_Type):: CSEM_SfcOptics_AD
-
-    TYPE(CSEM_Atmosphere_Parameters)  :: Atmos_AD 
- 
-   
 
     ! ------
     ! Set up
@@ -1987,20 +1787,6 @@ CONTAINS
     Reflectivity_AD = ZERO
     Direct_Reflectivity_AD = ZERO
 
-    CALL CSEM_SfcOptics_AD%Init(N_Angles=nZ)
-    CSEM_SfcOptics_AD%Frequency    =  SC(SensorIndex)%Frequency(ChannelIndex)
-    CSEM_SfcOptics_AD%Wavenumber   =  SC(SensorIndex)%Wavenumber(ChannelIndex)
-    CSEM_SfcOptics_AD%Is_Solar     =  SpcCoeff_IsSolar(SC(SensorIndex), ChannelIndex=ChannelIndex)
-    CSEM_SfcOptics_AD%Angle(1:nZ)  =  SfcOptics%Angle(1:nZ)
-    CSEM_SfcOptics_AD%Weight(1:nZ) =  SfcOptics%Weight(1:nZ)
- 
-    Error_Status = CRTM_CSEM_Input_Adaptor(   &
-                   Surface_AD,                &  ! Input
-                   CSEM_Land_AD,      &  ! Output
-                   CSEM_Water_AD,     &  ! Output
-                   CSEM_Snow_AD,      &  ! Output
-                   CSEM_Ice_AD)    
-
 
       !##########################################################################
       !##########################################################################
@@ -2011,6 +1797,7 @@ CONTAINS
       !##########################################################################
 
       Sensor_Select: IF ( SpcCoeff_IsMicrowaveSensor( SC(SensorIndex) ) ) THEN
+
 
         !#----------------------------------------------------------------------#
         !#                 -- HANDLE THE DECOUPLED POLARISATION --              #
@@ -2168,7 +1955,6 @@ CONTAINS
 
         END IF Decoupled_Polarization
 
- 
 
         ! -------------------------------------
         ! Microwave ICE emissivity/reflectivity
@@ -2179,22 +1965,20 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:2) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:2) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:2) + &
             (Emissivity_AD(1:nZ,1:2)*Surface%Ice_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
             (Reflectivity_AD(1:nZ,1:2,1:nZ,1:2)*Surface%Ice_Coverage)
 
           ! Compute the surface optics adjoints
-          Error_Status = CSEM_Compute_IceMW_SfcOptics_AD( CSEM_Ice_AD )
+          Error_Status = Compute_MW_Ice_SfcOptics_AD( SfcOptics_AD )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW ice SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-          SfcOptics_AD%Emissivity = ZERO
-          SfcOptics_AD%Reflectivity = ZERO
         END IF Microwave_Ice
 
 
@@ -2208,22 +1992,20 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:2) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:2) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:2) + &
             (Emissivity_AD(1:nZ,1:2)*Surface%Snow_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
             (Reflectivity_AD(1:nZ,1:2,1:nZ,1:2)*Surface%Snow_Coverage)
 
           ! Compute the surface optics adjoints
-          Error_Status = CSEM_Compute_SnowMW_SfcOptics_AD( CSEM_Snow_AD )
-         IF ( Error_Status /= SUCCESS ) THEN
+          Error_Status = Compute_MW_Snow_SfcOptics_AD( SfcOptics_AD )
+          IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW snow SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-          SfcOptics_AD%Emissivity = ZERO
-          SfcOptics_AD%Reflectivity = ZERO
 
         END IF Microwave_Snow
 
@@ -2233,49 +2015,33 @@ CONTAINS
         ! ---------------------------------------
         Microwave_Water: IF( Surface%Water_Coverage > ZERO ) THEN
 
-          !Surface_AD%Wind_Speed=0.0_fp;Surface_AD%Water_Temperature=0.0_fp
-          !Surface_AD%Salinity =0.0_fp      
-
           ! The surface optics properties based on water coverage fraction
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
-          SfcOptics_AD%Emissivity(1:nZ,1:4) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:2) + &
-            (Emissivity_AD(1:nZ,1:4)*Surface%Water_Coverage)
-          SfcOptics_AD%Reflectivity(1:nZ,1:4,1:nZ,1:4) = &
-           ! SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
-            (Reflectivity_AD(1:nZ,1:4,1:nZ,1:4)*Surface%Water_Coverage)
-    
-          ! Compute the surface optics adjoints
-          DO i = 1, nZ
-            CSEM_SfcOptics_AD%Emissivity(i,1:4)         = SfcOptics_AD%Emissivity(i,1:4)
-            CSEM_SfcOptics_AD%Reflectivity(i,1:4,i,1:4) = SfcOptics_AD%Reflectivity(i,1:4,i,1:4)
-          END DO 
-         
-          Atmos_AD%Transmittance = SfcOptics_AD%Transmittance
+          SfcOptics_AD%Emissivity(1:nZ,1:2) = &
+            SfcOptics_AD%Emissivity(1:nZ,1:2) + &
+            (Emissivity_AD(1:nZ,1:2)*Surface%Water_Coverage)
+          SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) = &
+            SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            (Reflectivity_AD(1:nZ,1:2,1:nZ,1:2)*Surface%Water_Coverage)
 
-          Error_Status =  CSEM_Compute_WaterMW_SfcOptics_AD( &
-                          CSEM_SfcOptics_AD,   &  
-                          CSEM_Water_AD,       &  
-                          Atmos_AD,            &  
-                         iVar%CSEM_MWWSOV)                          
-         IF(COM_CRTM_CSEM) THEN   
-           WRITE(*,*) 'CSEM_Water_AD',CSEM_Water_AD%Wind_Speed, &
-             CSEM_Water_AD%Water_Temperature,&
-             CSEM_Water_AD%Salinity
-         ENDIF
-         IF ( Error_Status /= SUCCESS ) THEN
+          ! Compute the surface optics adjoints
+          Error_Status = Compute_MW_Water_SfcOptics_AD( &
+                           SfcOptics   , &  ! Input
+                           SfcOptics_AD, &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           Surface_AD  , &  ! Output
+                           iVar%MWWSOV   )  ! Internal variable input
+          IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW water SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-  
-          Error_Status =  CSEM_CRTM_Input_Adaptor(Surface_AD, CSEM_Water=CSEM_Water_AD) 
-          SfcOptics_AD%Transmittance = Atmos_AD%Transmittance
-          SfcOptics_AD%Emissivity = ZERO
-          SfcOptics_AD%Reflectivity = ZERO
-       END IF Microwave_Water
+
+        END IF Microwave_Water
 
 
         ! --------------------------------------
@@ -2287,33 +2053,23 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:2) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:2) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:2) + &
             (Emissivity_AD(1:nZ,1:2)*Surface%Land_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:2,1:nZ,1:2) + &
             (Reflectivity_AD(1:nZ,1:2,1:nZ,1:2)*Surface%Land_Coverage)
-          ! Compute the surface optics adjoints
-          DO i = 1, nZ
-            CSEM_SfcOptics_AD%Emissivity(i,1:2)         = SfcOptics_AD%Emissivity(i,1:2)
-            CSEM_SfcOptics_AD%Reflectivity(i,1:2,i,1:2) = SfcOptics_AD%Reflectivity(i,1:2,i,1:2)
-          END DO 
 
           ! Compute the surface optics adjoints
-          Error_Status = CSEM_Compute_LandMW_SfcOptics_AD (     &
-                         CSEM_SfcOptics_AD,                     &
-                         CSEM_Land_AD,                  &
-                         iVar%CSEM_MWLSOV   )      
+          Error_Status = Compute_MW_Land_SfcOptics_AD( SfcOptics_AD )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing MW land SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-          Error_Status =  CSEM_CRTM_Input_Adaptor(Surface_AD,CSEM_Land=CSEM_Land_AD) 
-          SfcOptics_AD%Emissivity = ZERO
-          SfcOptics_AD%Reflectivity = ZERO
 
         END IF Microwave_Land
+
 
 
       !##########################################################################
@@ -2325,13 +2081,14 @@ CONTAINS
       !##########################################################################
 
       ELSE IF ( SpcCoeff_IsInfraredSensor( SC(SensorIndex) ) ) THEN
+
         Reflectivity_AD(1:nZ,1,1:nZ,1:nL) = SfcOptics_AD%Reflectivity(1:nZ,1,1:nZ,1:nL)
         SfcOptics_AD%Reflectivity = ZERO        
         Emissivity_AD(1:nZ,1:nL) = SfcOptics_AD%Emissivity(1:nZ,1:nL)
         SfcOptics_AD%Emissivity = ZERO
         Direct_Reflectivity_AD(1:nZ,1) = SfcOptics_AD%Direct_Reflectivity(1:nZ,1)
         SfcOptics_AD%Direct_Reflectivity(1:nZ,1) = ZERO
-
+                          
         ! ------------------------------------
         ! Infrared ICE emissivity/reflectivity
         ! ------------------------------------
@@ -2341,17 +2098,16 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
             (Emissivity_AD(1:nZ,1:nL)*Surface%Ice_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
             (Reflectivity_AD(1:nZ,1:nL,1:nZ,1:nL)*Surface%Ice_Coverage)
           SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
             (Direct_Reflectivity_AD(1:nZ,1:nL)*Surface%Ice_Coverage) 
-
           ! Compute the surface optics adjoints
-          Error_Status = CSEM_Compute_IceIR_SfcOptics_AD( CSEM_Ice_AD )
+          Error_Status = Compute_IR_Ice_SfcOptics_AD( SfcOptics_AD )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR ice SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -2360,6 +2116,7 @@ CONTAINS
           END IF
 
         END IF Infrared_Ice
+
 
         ! -------------------------------------
         ! Infrared SNOW emissivity/reflectivity
@@ -2370,17 +2127,16 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
             (Emissivity_AD(1:nZ,1:nL)*Surface%Snow_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
             (Reflectivity_AD(1:nZ,1:nL,1:nZ,1:nL)*Surface%Snow_Coverage)
           SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
             (Direct_Reflectivity_AD(1:nZ,1:nL)*Surface%Snow_Coverage) 
-
           ! Compute the surface optics adjoints
-          Error_Status = CSEM_Compute_SnowIR_SfcOptics_AD( CSEM_Snow_AD )
+          Error_Status = Compute_IR_Snow_SfcOptics_AD( SfcOptics_AD )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR snow SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -2389,6 +2145,7 @@ CONTAINS
           END IF
 
         END IF Infrared_Snow
+
 
         ! --------------------------------------
         ! Infrared WATER emissivity/reflectivity
@@ -2399,39 +2156,30 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
             (Emissivity_AD(1:nZ,1:nL)*Surface%Water_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
             (Reflectivity_AD(1:nZ,1:nL,1:nZ,1:nL)*Surface%Water_Coverage)
           SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
             (Direct_Reflectivity_AD(1:nZ,1:nL)*Surface%Water_Coverage) 
-
-          DO i = 1, nZ
-             CSEM_SfcOptics_AD%Emissivity(i,1:2)           =  SfcOptics_AD%Emissivity(i,1:2)
-             CSEM_SfcOptics_AD%Reflectivity(i,1:2,i,1:2)   =  SfcOptics_AD%Reflectivity(i,1:2,i,1:2)
-             CSEM_SfcOptics_AD%Direct_Reflectivity(i,1:2)  =  SfcOptics_AD%Direct_Reflectivity(i,1:2)
-          END DO
-          !Surface_AD%Wind_Speed=0.0_fp;Surface_AD%Water_Temperature=0.0_fp
-          !Surface_AD%Salinity =0.0_fp      
-  
-          Error_Status = CSEM_Compute_WaterIR_SfcOptics_AD(       &
-                         CSEM_SfcOptics_AD,                       &  
-                         CSEM_Water_AD,                   &
-                         iVar%CSEM_IRWSOV)  
-
-          IF(COM_CRTM_CSEM) THEN   
-             WRITE(*,*) 'CSEM_Water_AD',CSEM_Water_AD%Wind_Speed
-          END IF
+          ! Compute the surface optics adjoints
+          Error_Status = Compute_IR_Water_SfcOptics_AD( &
+                           Surface     , &  ! Input
+                           SfcOptics   , &  ! Input
+                           SfcOptics_AD, &  ! Input
+                           GeometryInfo, &  ! Input
+                           SensorIndex , &  ! Input
+                           ChannelIndex, &  ! Input
+                           Surface_AD  , &  ! Output
+                           iVar%IRWSOV   )  ! Internal variable input
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR water SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
             CALL Display_Message( ROUTINE_NAME, Message, Error_Status )
             RETURN
           END IF
-  
-          Error_Status =  CSEM_CRTM_Input_Adaptor(Surface_AD, CSEM_Water=CSEM_Water_AD) 
 
         END IF Infrared_Water
 
@@ -2445,18 +2193,17 @@ CONTAINS
           ! Note that the Emissivity_AD and Reflectivity_AD local adjoints
           ! are NOT zeroed here.
           SfcOptics_AD%Emissivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Emissivity(1:nZ,1:nL) + &
             (Emissivity_AD(1:nZ,1:nL)*Surface%Land_Coverage)
           SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) = &
-            !SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
+            SfcOptics_AD%Reflectivity(1:nZ,1:nL,1:nZ,1:nL) + &
             (Reflectivity_AD(1:nZ,1:nL,1:nZ,1:nL)*Surface%Land_Coverage)
           SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) = &
-            !SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
+            SfcOptics_AD%Direct_Reflectivity(1:nZ,1:nL) + &
             (Direct_Reflectivity_AD(1:nZ,1:nL)*Surface%Land_Coverage) 
-
           ! Compute the surface optics adjoints
           ! **STUB PROCEDURE**
-          Error_Status = CSEM_Compute_LandIR_SfcOptics_AD( CSEM_Land_AD )
+          Error_Status = Compute_IR_Land_SfcOptics_AD( SfcOptics_AD )
           IF ( Error_Status /= SUCCESS ) THEN
             WRITE( Message,'("Error computing IR land SfcOptics_AD at ",&
                             &"channel index ",i0)' ) ChannelIndex
@@ -2476,9 +2223,7 @@ CONTAINS
       !##########################################################################
       !##########################################################################
 
-      !ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
-      ELSE IF (SpcCoeff_IsVisibleSensor(SC(SensorIndex)).or. &
-           SpcCoeff_IsUltravioletSensor(SC(SensorIndex)) ) THEN
+      ELSE IF ( SpcCoeff_IsVisibleSensor( SC(SensorIndex) ) ) THEN
 
 
         ! -------------------
@@ -2507,166 +2252,5 @@ CONTAINS
       END IF Sensor_Select
 
   END FUNCTION CRTM_Compute_SfcOptics_AD
-  
-  
-  
-!===============================================================================
-!
-!===============================================================================
- FUNCTION CRTM_CSEM_Input_Adaptor( &
-    Surface,     &  ! Input
-    CSEM_Land,   &  ! Output
-    CSEM_Water,  &  ! Output
-    CSEM_Snow,   &  ! Output
-    CSEM_Ice)    &  ! Output
-  RESULT( Error_Status )
-    ! Arguments
-    TYPE(CRTM_Surface_type)          , INTENT(IN)   :: Surface
-    TYPE(CSEM_Land_Surface) ,OPTIONAL, INTENT(OUT)  :: CSEM_Land
-    TYPE(CSEM_Water_Surface),OPTIONAL, INTENT(OUT)  :: CSEM_Water
-    TYPE(CSEM_Snow_Surface) ,OPTIONAL, INTENT(OUT)  :: CSEM_Snow
-    TYPE(CSEM_Ice_Surface)  ,OPTIONAL, INTENT(OUT)  :: CSEM_Ice
- 
-    ! Function result
-    INTEGER :: Error_Status
-    ! Local parameters
-    CHARACTER(*), PARAMETER :: ROUTINE_NAME = 'CRTM_CSEM_Input_Adaptor'
-    ! Local variables
-    CHARACTER(ML) :: Message
-
-
-    ! ------
-    ! Set up
-    ! ------
-    Error_Status = SUCCESS
-
- 
-    IF( PRESENT(CSEM_Land) ) THEN
-        CSEM_Land%Top_Soil_Moisture     = Surface%Soil_Moisture_Content
-        CSEM_Land%vegetation_Fraction   = Surface%Vegetation_Fraction
-        CSEM_Land%Top_Soil_Temperature  = Surface%Soil_Temperature
-        CSEM_Land%Land_Skin_Temperature = Surface%Land_Temperature
-        CSEM_Land%LAI                   = Surface%Lai
-        CSEM_Land%soil_Type             = Surface%Soil_Type
-        CSEM_Land%Vegetation_Type       = Surface%Vegetation_Type
-        CSEM_Land%Land_Cover_Type       = Surface%Land_Type
-
-    END IF
-     
-    IF( PRESENT(CSEM_Snow) ) THEN
-   
-        CSEM_Snow%Snow_Type             = Surface%Snow_Type
-        CSEM_Snow%Snow_Temperature      = Surface%Snow_Temperature
-        CSEM_Snow%Snow_Depth            = Surface%Snow_Depth
-        CSEM_Snow%Snow_Density          = Surface%Snow_Density 
-        CSEM_Snow%Snow_Grain_Size       = Surface%Snow_Grain_Size
-        CSEM_Snow%soil_Type             = Surface%Soil_Type
-        CSEM_Snow%Top_Soil_Temperature  = Surface%Soil_Temperature
-        CSEM_Snow%Top_Soil_Moisture_Content = Surface%Soil_Moisture_Content
-        CSEM_Land%LAI                   = Surface%Lai
-        CSEM_Land%Vegetation_Type       = Surface%Vegetation_Type
-    END IF
-
-
-    IF( PRESENT(CSEM_Ice) ) THEN
-        CSEM_Ice%Ice_Type               = Surface%Ice_Type
-        CSEM_Ice%Ice_Temperature        = Surface%Ice_Temperature
-        CSEM_Ice%Ice_Thickness          = Surface%Ice_Thickness
-        CSEM_Ice%Ice_Density            = Surface%Ice_Density 
-        CSEM_Ice%Ice_Roughness          = Surface%Ice_Roughness
-        CSEM_Ice%Salinity               = Surface%Salinity
-
-    END IF
-
-
-    IF( PRESENT(CSEM_Water) ) THEN
-        CSEM_Water%Water_Type           = Surface%Water_Type 
-        CSEM_Water%Water_Temperature    = Surface%Water_Temperature
-        CSEM_Water%Wind_Speed           = Surface%Wind_Speed
-        CSEM_Water%Wind_Direction       = Surface%Wind_Direction
-        CSEM_Water%Salinity             = Surface%Salinity
-    END IF
-
-
-   END FUNCTION CRTM_CSEM_Input_Adaptor
-
-!===============================================================================
-!
-!===============================================================================
- FUNCTION CSEM_CRTM_Input_Adaptor( &
-    Surface,     &  ! output
-    CSEM_Land,   &  ! input
-    CSEM_Water,  &  ! input
-    CSEM_Snow,   &  ! input
-    CSEM_Ice)    &  ! input
-  RESULT( Error_Status )
-    ! Arguments
-    TYPE(CRTM_Surface_type)     , INTENT(INOUT)     :: Surface
-   
-    TYPE(CSEM_Land_Surface) ,OPTIONAL, INTENT(IN)  :: CSEM_Land
-    TYPE(CSEM_Water_Surface),OPTIONAL, INTENT(IN)  :: CSEM_Water
-    TYPE(CSEM_Snow_Surface) ,OPTIONAL, INTENT(IN)  :: CSEM_Snow
-    TYPE(CSEM_Ice_Surface)  ,OPTIONAL, INTENT(IN)  :: CSEM_Ice
- 
-    ! Function result
-    INTEGER :: Error_Status
-    ! Local parameters
-    CHARACTER(*), PARAMETER :: ROUTINE_NAME = 'CSEM_CRTM_Input_Adaptor'
-    ! Local variables
-    CHARACTER(ML) :: Message
-
-    ! ------
-    ! Set up
-    ! ------
-    Error_Status = SUCCESS
- 
-    IF( PRESENT(CSEM_Land) ) THEN
-        Surface%Soil_Moisture_Content  =   CSEM_Land%Top_Soil_Moisture     
-        Surface%Vegetation_Fraction    =   CSEM_Land%vegetation_Fraction  
-        Surface%Soil_Temperature       =   CSEM_Land%Top_Soil_Temperature  
-        Surface%Land_Temperature       =   CSEM_Land%Land_Skin_Temperature 
-        Surface%Lai                    =   CSEM_Land%LAI                  
-        Surface%Soil_Type              =   CSEM_Land%soil_Type            
-        Surface%Vegetation_Type        =   CSEM_Land%Vegetation_Type  
-        Surface%Land_Type              =   CSEM_Land%Land_Cover_Type 
-
-    END IF
-     
-    IF( PRESENT(CSEM_Snow) ) THEN
-   
-        Surface%Snow_Type              =   CSEM_Snow%Snow_Type       
-        Surface%Snow_Temperature       =   CSEM_Snow%Snow_Temperature     
-        Surface%Snow_Depth             =   CSEM_Snow%Snow_Depth          
-        Surface%Snow_Density           =   CSEM_Snow%Snow_Density          
-        Surface%Snow_Grain_Size        =   CSEM_Snow%Snow_Grain_Size      
-        Surface%Soil_Type              =   CSEM_Snow%soil_Type            
-        Surface%Soil_Temperature       =   CSEM_Snow%Top_Soil_Temperature  
-        Surface%Soil_Moisture_Content  =   CSEM_Snow%Top_Soil_Moisture_Content 
-        Surface%Lai                    =   CSEM_Land%LAI                  
-        Surface%Vegetation_Type        =   CSEM_Land%Vegetation_Type  
-    END IF
-
-
-    IF( PRESENT(CSEM_Ice) ) THEN
-        Surface%Ice_Type              =    CSEM_Ice%Ice_Type  
-        Surface%Ice_Temperature       =    CSEM_Ice%Ice_Temperature  
-        Surface%Ice_Thickness         =    CSEM_Ice%Ice_Thickness  
-        Surface%Ice_Density           =    CSEM_Ice%Ice_Density  
-        Surface%Ice_Roughness         =    CSEM_Ice%Ice_Roughness  
-        Surface%Salinity              =    CSEM_Ice%Salinity 
-
-    END IF
-
-
-    IF( PRESENT(CSEM_Water) ) THEN
-        Surface%Water_Type            =    CSEM_Water%Water_Type    
-        Surface%Water_Temperature     =    CSEM_Water%Water_Temperature   
-        Surface%Wind_Speed            =    CSEM_Water%Wind_Speed  
-        Surface%Wind_Direction        =    CSEM_Water%Wind_Direction 
-        Surface%Salinity              =    CSEM_Water%Salinity            
-    END IF
-
-
-   END FUNCTION CSEM_CRTM_Input_Adaptor
 
 END MODULE CRTM_SfcOptics

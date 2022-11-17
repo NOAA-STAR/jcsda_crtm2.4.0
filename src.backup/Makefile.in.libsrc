@@ -16,7 +16,7 @@ installdir = $(prefix)/$(distdir)
 
 # Tool-specific substitution variables
 FC      = @FC@
-FCFLAGS = @FCFLAGS@ -c   -I${installdir}/include
+FCFLAGS = @FCFLAGS@ -c
 AR      = @AR@
 ARFLAGS = @ARFLAGS@
 RANLIB  = @RANLIB@
