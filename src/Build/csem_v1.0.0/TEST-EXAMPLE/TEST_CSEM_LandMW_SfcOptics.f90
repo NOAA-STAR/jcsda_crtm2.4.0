@@ -53,7 +53,7 @@ PROGRAM TEST_CSEM_LandMW_SfcOptics
   WRITE(*,*)TRIM(CSEM_ALG%NAME)
   WRITE(*,*)SfcOptics%Emissivity(1,:)
   
-  CSEM_ALG%NAME = "TELSEM_ATLAS"
+  CSEM_ALG%NAME = "TELSEM2_ATLAS"
   CALL set_model_option(CSEM_ALG)
   Error_Status = CSEM_Compute_LandMW_SfcOptics( &
       Surface                   ,&  ! Input
